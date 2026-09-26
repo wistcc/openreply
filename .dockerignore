@@ -6,3 +6,6 @@ node_modules
 __tests__
 docs
 *.md
+
+# deploy stack (secrets live in deploy/.env on the server)
+deploy

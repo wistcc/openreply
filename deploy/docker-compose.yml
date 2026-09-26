@@ -1,0 +1,112 @@
+# OpenReply production stack for a single VPS.
+#
+#   cd deploy && docker compose up -d --build
+#
+# Everything shares one image built from the repo's Dockerfile. Caddy serves
+# HTTPS for $DOMAIN (certificates are issued automatically on first request).
+# Secrets live in deploy/.env (see .env.production.example); never commit it.
+
+name: openreply
+
+x-app: &app
+  image: openreply:latest
+  env_file: .env
+  restart: unless-stopped
+
+services:
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: openreply
+      POSTGRES_USER: openreply
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in deploy/.env}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U openreply -d openreply"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    # BullMQ requires noeviction; AOF keeps queued sends across restarts.
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory-policy", "noeviction"]
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # One-shot: applies Prisma migrations, then exits. web and worker wait for it.
+  migrate:
+    <<: *app
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    command: ["npx", "prisma", "migrate", "deploy"]
+    restart: "no"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  web:
+    <<: *app
+    command: ["npm", "run", "start"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    # /api/health answers 503 until the worker heartbeat lands, so probe /login.
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:3000/login || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+  worker:
+    <<: *app
+    command: ["npm", "run", "worker"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+
+  # Runs the /api/cron jobs (token refresh, attach-next-reel, follower snapshots).
+  cron:
+    <<: *app
+    command: ["sh", "scripts/cron.sh"]
+    environment:
+      CRON_BASE_URL: http://web:3000
+    depends_on:
+      web:
+        condition: service_healthy
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      DOMAIN: ${DOMAIN:?set DOMAIN in deploy/.env}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - web
+
+volumes:
+  pgdata:
+  redisdata:
+  caddy_data:
+  caddy_config:

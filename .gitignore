@@ -43,3 +43,7 @@ next-env.d.ts
 
 /app/generated/prisma
 .gstack/
+
+# production secrets for the VPS stack
+deploy/.env
+!deploy/.env.production.example
