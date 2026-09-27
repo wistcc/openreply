@@ -6,6 +6,7 @@ import { Suspense, useEffect, useState } from "react";
 import type { AccountOption } from "@/components/account-select";
 import { ZernioConnection } from "@/components/zernio-connection";
 import { InstagramConnectNotice } from "@/components/instagram-connect-notice";
+import { useBranding } from "@/components/branding";
 
 interface SettingsData {
   workspace: {
@@ -51,6 +52,7 @@ interface WorkspaceMembersData {
 
 export default function SettingsPage() {
   const { t, label, locale } = useI18n();
+  const { showZernio } = useBranding();
   const [data, setData] = useState<SettingsData | null>(null);
   const [membersData, setMembersData] = useState<WorkspaceMembersData | null>(
     null
@@ -147,7 +149,7 @@ export default function SettingsPage() {
         <p className="text-sm text-muted">{t("Saved in this browser. Campaign messages stay unchanged.")}</p>
       </section>
 
-      <ZernioConnection canManage={canManageMembers} />
+      {showZernio && <ZernioConnection canManage={canManageMembers} />}
 
       <section className="panel rounded p-4 sm:p-6">
         <h2 className="text-base font-semibold mb-6">{t("Instagram Connection")}</h2>
@@ -225,7 +227,7 @@ export default function SettingsPage() {
             href="/api/instagram/connect"
             className="px-4 py-2 rounded text-sm font-medium transition-colors bg-accent text-white hover:bg-accent-hover"
           >
-            {t("Connect using your own Meta app")}
+            {showZernio ? t("Connect using your own Meta app") : t("Connect Instagram")}
           </a>
         </div>
       </section>

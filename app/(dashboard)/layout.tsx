@@ -5,8 +5,12 @@ import DashboardShell from "@/components/dashboard-shell";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db/client";
 import { ensureWorkspaceForUser } from "@/lib/workspace";
+import { getLegalOperator } from "@/lib/legal";
+import { BrandingProvider } from "@/components/branding";
 
 export async function generateMetadata() {
+  const { productName } = getLegalOperator();
+  if (productName !== "OpenReply") return { title: productName };
   const { t } = await getI18n();
   return { title: t("OpenReply - Open source Instagram comment-to-DM automation") };
 }
@@ -33,15 +37,22 @@ export default async function DashboardLayout({
     select: { username: true },
   });
 
+  const branding = {
+    productName: getLegalOperator().productName,
+    showZernio: process.env.HIDE_ZERNIO_UI !== "true",
+  };
+
   return (
     <I18nProvider locale={locale}>
-      <DashboardShell
-        workspaceName={workspace.name}
-        instagramUsername={accounts[0]?.username ?? null}
-        instagramAccountCount={accounts.length}
-      >
-        {children}
-      </DashboardShell>
+      <BrandingProvider value={branding}>
+        <DashboardShell
+          workspaceName={workspace.name}
+          instagramUsername={accounts[0]?.username ?? null}
+          instagramAccountCount={accounts.length}
+        >
+          {children}
+        </DashboardShell>
+      </BrandingProvider>
     </I18nProvider>
   );
 }

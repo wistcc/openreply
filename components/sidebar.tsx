@@ -12,6 +12,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { zernioLink } from "@/lib/zernio-links";
 import { usePathname } from "next/navigation";
+import { useBranding } from "@/components/branding";
 
 const navItems = [
   { label: "Dashboard", href: "/dashboard" },
@@ -36,6 +37,7 @@ export default function Sidebar({
 }: SidebarProps) {
   const { t } = useI18n();
   const pathname = usePathname();
+  const { productName, showZernio } = useBranding();
 
   return (
     <>
@@ -62,7 +64,7 @@ export default function Sidebar({
           style={{ paddingTop: "calc(1.25rem + env(safe-area-inset-top))" }}
         >
           <Link href="/dashboard" className="text-base font-semibold">
-            OpenReply
+            {productName}
           </Link>
         </div>
 
@@ -95,7 +97,7 @@ export default function Sidebar({
           <div className="mb-4"><LanguageSwitcher /></div>
           <p className="text-sm text-foreground truncate">{workspaceName}</p>
           <p className="text-xs text-muted">{t("Self-hosted")}</p>
-          <a
+          {showZernio && <a
             href={zernioLink({ placement: "sidebar" })}
             target="_blank"
             rel="sponsored noopener noreferrer"
@@ -109,7 +111,7 @@ export default function Sidebar({
               height={20}
               className="m-2"
             />
-          </a>
+          </a>}
         </div>
       </aside>
     </>
