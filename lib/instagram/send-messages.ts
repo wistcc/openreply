@@ -67,6 +67,20 @@ async function sendZernioMessage({
   };
 }
 
+// Meta can answer code 1 ("An unknown error has occurred") or code 2 (service
+// temporarily unavailable) after the message was already delivered, and a retry
+// then sends it again. Surface those as the unconfirmed-delivery error the DM
+// worker already honors for Zernio, so it records the send and does not retry.
+async function metaSend<T>(send: () => Promise<T>): Promise<T> {
+  try {
+    return await send();
+  } catch (error) {
+    if (error instanceof meta.MetaApiError && (error.code === 1 || error.code === 2))
+      throw new ZernioDeliveryUnconfirmedError();
+    throw error;
+  }
+}
+
 function linkButtons(buttons: meta.LinkButton[]): Button[] {
   return buttons
     .slice(0, 3)
@@ -87,12 +101,12 @@ export async function sendPrivateReply({
   postId?: string;
 }) {
   if (context.provider === "META")
-    return meta.sendPrivateReply(
+    return metaSend(() => meta.sendPrivateReply(
       context.accessToken,
       instagramAccountId,
       commentId,
       message
-    );
+    ));
   return sendZernioMessage({ context, commentId, postId, text: message });
 }
 
@@ -114,14 +128,14 @@ export async function sendPrivateReplyWithButton({
   postId?: string;
 }) {
   if (context.provider === "META")
-    return meta.sendPrivateReplyWithButton(
+    return metaSend(() => meta.sendPrivateReplyWithButton(
       context.accessToken,
       instagramAccountId,
       commentId,
       text,
       buttonTitle,
       payload
-    );
+    ));
   return sendZernioMessage({
     context,
     commentId,
@@ -147,14 +161,14 @@ export async function sendDirectMessageWithButton({
   payload: string;
 }) {
   if (context.provider === "META")
-    return meta.sendDirectMessageWithButton(
+    return metaSend(() => meta.sendDirectMessageWithButton(
       context.accessToken,
       instagramAccountId,
       userId,
       text,
       buttonTitle,
       payload
-    );
+    ));
   return sendZernioMessage({
     context,
     recipientId: userId,
@@ -179,13 +193,13 @@ export async function sendPrivateReplyWithLinkButton({
   postId?: string;
 }) {
   if (context.provider === "META")
-    return meta.sendPrivateReplyWithLinkButton(
+    return metaSend(() => meta.sendPrivateReplyWithLinkButton(
       context.accessToken,
       instagramAccountId,
       commentId,
       text,
       buttons
-    );
+    ));
   return sendZernioMessage({
     context,
     commentId,
@@ -207,12 +221,12 @@ export async function sendDirectMessage({
   message: string;
 }) {
   if (context.provider === "META")
-    return meta.sendDirectMessage(
+    return metaSend(() => meta.sendDirectMessage(
       context.accessToken,
       instagramAccountId,
       userId,
       message
-    );
+    ));
   return sendZernioMessage({ context, recipientId: userId, text: message });
 }
 
@@ -230,13 +244,13 @@ export async function sendDirectMessageWithLinkButton({
   buttons: meta.LinkButton[];
 }) {
   if (context.provider === "META")
-    return meta.sendDirectMessageWithLinkButton(
+    return metaSend(() => meta.sendDirectMessageWithLinkButton(
       context.accessToken,
       instagramAccountId,
       userId,
       text,
       buttons
-    );
+    ));
   return sendZernioMessage({
     context,
     recipientId: userId,
@@ -257,7 +271,7 @@ export async function sendCommentReply({
   postId?: string;
 }) {
   if (context.provider === "META")
-    return meta.sendCommentReply(context.accessToken, commentId, message);
+    return metaSend(() => meta.sendCommentReply(context.accessToken, commentId, message));
   const result = await zernioRequest<{ data: { commentId: string } }>({
     apiKey: context.apiKey,
     path: `/inbox/comments/${encodeURIComponent(postId ?? commentId)}`,
