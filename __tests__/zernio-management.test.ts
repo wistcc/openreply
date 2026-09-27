@@ -13,6 +13,20 @@ describe('Zernio workspace management', () => {
     ] });
     expect(await listInstagramAccounts({ apiKey: 'key', profileId: 'p' })).toEqual([{ id: 'a', instagramId: 'ig1', username: 'mine', name: null }]);
   });
+  it('lists Instagram accounts from every profile when ZERNIO_ALL_PROFILES is true', async () => {
+    vi.stubEnv('ZERNIO_ALL_PROFILES', 'true');
+    request.mockResolvedValue({ accounts: [
+      { _id: 'a', platform: 'instagram', profileId: { _id: 'p' }, platformUserId: 'ig1', username: 'mine', isActive: true },
+      { _id: 'b', platform: 'instagram', profileId: 'other', platformUserId: 'ig2', username: 'other', isActive: true },
+      { _id: 'c', platform: 'facebook', profileId: 'p', platformUserId: 'fb', username: 'page', isActive: true },
+    ] });
+    expect(await listInstagramAccounts({ apiKey: 'key', profileId: 'p' })).toEqual([
+      { id: 'a', instagramId: 'ig1', username: 'mine', name: null },
+      { id: 'b', instagramId: 'ig2', username: 'other', name: null },
+    ]);
+    expect(request.mock.calls[0][0]).toMatchObject({ path: '/accounts?platform=instagram' });
+    vi.unstubAllEnvs();
+  });
   it('reuses only this installation webhook and preserves other subscriptions', async () => {
     request.mockResolvedValueOnce({ webhooks: [{ _id: 'other', url: 'https://customer.example/hook' }, { _id: 'ours', url: 'https://open.example/api/zernio/webhook/ws' }] }).mockResolvedValueOnce({});
     expect(await ensureWebhook({ apiKey: 'key', workspaceId: 'ws', secret: 'secret', baseUrl: 'https://open.example' })).toBe('ours');

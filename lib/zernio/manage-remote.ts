@@ -14,9 +14,14 @@ export async function listProfiles(apiKey: string) {
   return data.profiles.map(p => ({ id: p._id, name: p.name }));
 }
 
+// Zernio keeps one Instagram account per profile, so a single-owner instance that
+// wants several accounts in one workspace sets ZERNIO_ALL_PROFILES=true to list
+// every profile under the key. Leave it unset when a key is shared across tenants.
 export async function listInstagramAccounts({ apiKey, profileId }: { apiKey: string; profileId: string }) {
-  const data = accountsSchema.parse(await zernioRequest({ apiKey, path: `/accounts?profileId=${encodeURIComponent(profileId)}&platform=instagram` }));
-  return data.accounts.filter(a => a.platform === 'instagram' && a.isActive !== false && a.platformUserId && (typeof a.profileId === 'string' ? a.profileId : a.profileId._id) === profileId)
+  const allProfiles = process.env.ZERNIO_ALL_PROFILES === 'true';
+  const path = allProfiles ? '/accounts?platform=instagram' : `/accounts?profileId=${encodeURIComponent(profileId)}&platform=instagram`;
+  const data = accountsSchema.parse(await zernioRequest({ apiKey, path }));
+  return data.accounts.filter(a => a.platform === 'instagram' && a.isActive !== false && a.platformUserId && (allProfiles || (typeof a.profileId === 'string' ? a.profileId : a.profileId._id) === profileId))
     .map(a => ({ id: a._id, instagramId: a.platformUserId!, username: a.username, name: a.displayName ?? null }));
 }
 
