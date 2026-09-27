@@ -3,6 +3,8 @@ import { getI18n } from "@/lib/i18n/server";
 import { getCampaignTemplate } from "@/lib/templates/campaign-templates";
 import { DemoNotice } from "@/components/demo-notice";
 import { isPublicDemoHost } from "@/lib/env";
+import { getLegalOperator } from "@/lib/legal";
+import { getReviewerLogin } from "@/lib/reviewer-login";
 
 const GITHUB_URL = "https://github.com/diwenne/openreply";
 const SETUP_DOCS_URL = `${GITHUB_URL}/blob/main/docs/setup.md`;
@@ -22,6 +24,7 @@ export default async function LoginPage({
     checkEmail?: string;
     callbackUrl?: string;
     template?: string;
+    reviewer?: string;
   }>;
 }) {
   const { t } = await getI18n();
@@ -60,6 +63,9 @@ export default async function LoginPage({
     ? `/campaigns/new?template=${selectedTemplate.slug}`
     : null;
   const callbackUrl = params.callbackUrl ?? templateCallbackUrl ?? "/dashboard";
+  const reviewerLoginEnabled = getReviewerLogin() !== null;
+  const reviewerLoginFailed = params.reviewer === "invalid";
+  const { productName } = getLegalOperator();
 
   async function sendMagicLink(formData: FormData) {
     "use server";
@@ -74,7 +80,7 @@ export default async function LoginPage({
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <h1 className="text-2xl font-semibold text-foreground">
-            OpenReply
+            {productName}
           </h1>
           <p className="text-muted text-sm leading-relaxed mt-2">
             {selectedTemplate
@@ -133,6 +139,46 @@ export default async function LoginPage({
             </form>
           )}
         </div>
+
+        {reviewerLoginEnabled && !checkEmail && (
+          <details
+            className="panel rounded p-6 mt-4 shadow-black/40"
+            open={reviewerLoginFailed}
+          >
+            <summary className="cursor-pointer text-sm font-medium text-foreground">
+              App reviewer sign-in
+            </summary>
+            <form action="/api/reviewer-login" method="post" className="space-y-4 mt-4">
+              {reviewerLoginFailed && (
+                <p className="text-sm text-red-400">Wrong email or password.</p>
+              )}
+              <input
+                name="email"
+                type="email"
+                required
+                autoComplete="username"
+                placeholder="Reviewer email"
+                aria-label="Reviewer email"
+                className="w-full px-4 py-3 rounded bg-surface border border-border text-sm text-foreground placeholder:text-zinc-500 focus:border-accent/40 focus:outline-none transition-colors"
+              />
+              <input
+                name="password"
+                type="password"
+                required
+                autoComplete="current-password"
+                placeholder="Password"
+                aria-label="Password"
+                className="w-full px-4 py-3 rounded bg-surface border border-border text-sm text-foreground placeholder:text-zinc-500 focus:border-accent/40 focus:outline-none transition-colors"
+              />
+              <button
+                type="submit"
+                className="w-full inline-flex items-center justify-center rounded border border-border px-6 py-3 text-sm font-semibold text-foreground transition-colors hover:border-accent/40"
+              >
+                Sign in
+              </button>
+            </form>
+          </details>
+        )}
       </div>
     </div>
   );
